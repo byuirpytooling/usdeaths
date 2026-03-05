@@ -1,18 +1,8 @@
-library(tidyverse)
-library(usethis)
-
-# NOTE: 2006 marks a major structural change from 2003/2004.
-# A new vital statistics data access policy excluding geographic identifiers
-# goes into effect with the 2006 data year.
-# - record_type (pos 19) is dropped
-# - All geographic fields (positions 21-60) are removed and replaced with reserved positions
-# - The file layout is also separate for US and territories data from 2006 onward
-
-data_multiple_mortality_2006 <- tribble(
+data_mortality_multiple_2009 <- tribble(
   ~name,                        ~start, ~end, ~size, ~type, ~description,                                                        ~codes,
-  "reserved_1",                 1,      19,   19,    "str", "Reserved positions (blank; note: expanded from 18 to 19 vs pre-2006)", "",
+  "reserved_1",                 1,      19,   19,    "str", "Reserved positions (blank; note: expanded from 18 to 19 vs pre-2009)", "",
   "resident_status",            20,     20,   1,     "int", "Resident status",                                                    "1=Residents|2=Intrastate Nonresidents|3=Interstate Nonresidents|4=Foreign Residents",
-  "reserved_2",                 21,     60,   40,    "str", "Reserved positions (blank; geographic identifiers removed from 2006 onward per NCHS data access policy)", "",
+  "reserved_2",                 21,     60,   40,    "str", "Reserved positions (blank; geographic identifiers removed from 2009 onward per NCHS data access policy)", "",
   "education_1989",             61,     62,   2,     "str", "Education (1989 revision; blank if 2003 revision used)",            "00=No formal education|01-08=Years of elementary school|09=1 year of high school|10=2 years of high school|11=3 years of high school|12=4 years of high school|13=1 year of college|14=2 years of college|15=3 years of college|16=4 years of college|17=5 or more years of college|99=Not stated",
   "education_2003",             63,     63,   1,     "int", "Education (2003 revision; blank if 1989 revision used)",            "1=8th grade or less|2=9-12th grade no diploma|3=High school graduate or GED completed|4=Some college credit but no degree|5=Associate degree|6=Bachelor's degree|7=Master's degree|8=Doctorate or professional degree|9=Unknown",
   "education_reporting_flag",   64,     64,   1,     "int", "Education reporting flag",                                           "0=1989 revision of education item on certificate|1=2003 revision of education item on certificate|2=No education item on certificate",
@@ -29,7 +19,7 @@ data_multiple_mortality_2006 <- tribble(
   "marital_status",             84,     84,   1,     "str", "Marital status",                                                     "S=Never married single|M=Married|W=Widowed|D=Divorced|U=Marital status unknown",
   "day_of_week_of_death",       85,     85,   1,     "int", "Day of week of death",                                               "1=Sunday|2=Monday|3=Tuesday|4=Wednesday|5=Thursday|6=Friday|7=Saturday|9=Unknown",
   "reserved_4",                 86,     101,  16,    "str", "Reserved positions",                                                 "",
-  "current_data_year",          102,    105,  4,     "int", "Current data year",                                                  "2006=2006",
+  "current_data_year",          102,    105,  4,     "int", "Current data year",                                                  "2009=2009",
   "injury_at_work",             106,    106,  1,     "str", "Injury at work",                                                     "Y=Yes|N=No|U=Unknown",
   "manner_of_death",            107,    107,  1,     "str", "Manner of death",                                                    "1=Accident|2=Suicide|3=Homicide|4=Pending investigation|5=Could not determine|6=Self-Inflicted|7=Natural|blank=Not specified",
   "method_of_disposition",      108,    108,  1,     "str", "Method of disposition",                                              "B=Burial|C=Cremation|O=Other|U=Unknown",
@@ -100,4 +90,4 @@ data_multiple_mortality_2006 <- tribble(
   "hispanic_origin_race_recode", 488,   488,  1,     "int", "Hispanic origin/race recode",                                       "1=Mexican|2=Puerto Rican|3=Cuban|4=Central or South American|5=Other or unknown Hispanic|6=Non-Hispanic white|7=Non-Hispanic black|8=Non-Hispanic other races|9=Hispanic origin unknown",
 )
 
-usethis::use_data(data_multiple_mortality_2006, overwrite = TRUE)
+usethis::use_data(data_mortality_multiple_2009, overwrite = TRUE)
