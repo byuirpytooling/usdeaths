@@ -9,7 +9,7 @@
     return(df) # Return silently if no match is found
   }
 
-  # 2. Determine revision based on year (single-year input expected)
+  # 2. Determine revision based on year (single-year datasets; cdc_import passes year explicitly)
   years <- NULL
   if (!is.null(year)) {
     years <- stats::na.omit(c(year))
@@ -18,9 +18,8 @@
   } else if ("current_data_year" %in% names(df)) {
     years <- unique(stats::na.omit(df$current_data_year))
   }
-
   if (length(years) == 0) {
-    stop("`.enrich_causes()` could not determine year from `year`, `current_data_year`, or function argument.")
+    stop("`.enrich_causes()` could not determine year from `year`, `current_data_year`, or argument.")
   }
   revision <- if (years[1] >= 1999) "icd10" else "icd9"
   
