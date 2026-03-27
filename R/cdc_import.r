@@ -31,5 +31,6 @@ cdc_import <- function(section, year) {
     temp <- download_cdc(url)
     unzipped <- load_data(temp, meta)
     message("Decoding ", nrow(unzipped), " rows...")
-    decode_all(unzipped, meta)
+    decoded <- decode_all(unzipped, meta)
+    .enrich_causes(decoded, meta, year = year)
 }
