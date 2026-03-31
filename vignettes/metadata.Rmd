@@ -1,0 +1,292 @@
+---
+title: "Understanding usdeaths Metadata"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Understanding usdeaths Metadata}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+
+```{r setup, include = FALSE, eval=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+library(usdeaths)
+library(dplyr)
+```
+
+## What Is the Metadata?
+
+The CDC Vital Statistics files are distributed as fixed-width text files —
+each row is a long string of characters with no column headers. The only way
+to know what those characters mean is to consult the official CDC user guide.
+
+The `usdeaths` package ships that user guide knowledge as structured **metadata
+objects** — one per dataset and year. For example, `data_mortality_multiple_2024`
+describes the layout of the 2024 multiple-cause-of-death file. These metadata
+objects do two things:
+
+1. Tell `read_section()` exactly where to cut each field out of the raw file.
+2. Tell `decode_all()` and `decode_preview()` how to translate the CDC's
+   numeric codes into human-readable labels.
+
+You rarely need to work with the metadata directly. But understanding its
+structure helps you inspect fields, look up what a code means, and troubleshoot
+unexpected values in your data.
+
+---
+
+## Metadata Structure
+
+Every metadata object is a **tribble** with one row per field in the raw CDC
+file. All metadata objects share the same six columns:
+
+| Column        | Type  | What it tells you                                           |
+|---------------|-------|-------------------------------------------------------------|
+| `name`        | `chr` | The column name in the parsed tribble                        |
+| `start`       | `int` | Starting character position in the raw fixed-width file     |
+| `end`         | `int` | Ending character position                                   |
+| `size`        | `int` | Number of characters (`end - start + 1`)                    |
+| `type`        | `chr` | Storage type — `"int"` or `"str"`                           |
+| `description` | `chr` | Plain-English label for the field                           |
+| `codes`       | `chr` | Pipe-delimited `value=label` pairs, or `""` if not coded    |
+
+The `codes` column is the heart of the metadata. It stores the CDC's official
+value lookups in a compact pipe-delimited format:
+
+```
+"1=Residents|2=Intrastate Nonresidents|3=Interstate Nonresidents|4=Foreign Residents"
+```
+
+Each entry is a `value=label` pair separated by `|`. A blank string (`""`)
+means the field is either free-form text, a reserved filler position, or a
+plain numeric quantity that needs no decoding.
+
+---
+
+## Available Metadata Objects
+
+The package includes metadata objects for **mortality multiple cause files**
+going back to 1968, as well as birth cohort and births files. The naming
+convention is:
+
+```
+data_mortality_multiple_[YEAR]   # e.g. data_mortality_multiple_2024
+data_birth_cohort_[YEAR]         # e.g. data_birth_cohort_2010
+data_births_[YEAR]               # e.g. data_births_2022
+```
+
+To see the full list of available years use `get_available_years()`, which returns a tibble of dataset types and years:
+
+```{r available-years, eval=FALSE}
+get_available_years("mortality_multiple")
+```
+
+---
+
+## Exploring the Metadata
+
+### Exploring Metadata with get_fields()
+The easiest way to explore what data is available for a specific year is the get_fields() function. It cleans up the raw metadata by removing "filler" columns and providing a high-level summary.
+
+Listing all available fields
+To see what variables are available for the 2024 mortality data:
+```{r get-fields, eval=FALSE}
+get_fields(type = "mortality", years = 2024) |
+```
+
+Searching for specific topics
+The Births dataset is much larger (over 200 fields). You can use `get_fields()` to quickly find variables related to a specific topic, like "Tobacco" or "Weight":
+
+```{r, eval=FALSE}
+get_fields(type = "births", years = 2024) |> 
+  filter(grepl("weight", description, ignore.case = TRUE))
+```
+
+Searching over multiple years
+One of the most powerful features of `get_fields()` is passing a range of years. This allows you to identify "stable" variables versus those that were recently added or discontinued by the CDC.
+
+```{r, eval=FALSE}
+# Compare fields across a 5-year span
+fields_comparison <- get_fields(type = "births", years = 2020:2024)
+
+# If 'note' is empty, the field exists in ALL requested years.
+# If 'note' contains a year range, the field is only available in those years.
+fields_comparison |> 
+  filter(note != "") |> 
+  select(name, description, note) |> 
+  head()
+```
+
+### Viewing field names and descriptions
+
+```{r descriptions, eval=FALSE}
+data_mortality_multiple_2024 |>
+  select(name, start, end, description) |>
+  head(10)
+```
+
+### Finding fields that have code lookups
+
+Fields where `codes != ""` are the categorical fields that `decode_all()` and
+`decode_preview()` will translate for you:
+
+```{r coded-fields, eval=FALSE}
+data_mortality_multiple_2024 |>
+  filter(codes != "") |>
+  select(name, description)
+```
+
+### Looking up the codes for a specific field
+
+Use `filter()` and `pull()` to extract the codes string for any field, then
+pass it to `decode_column()` to see what values it recognises:
+
+```{r lookup-education, eval=FALSE}
+# What codes does the education field use?
+edu_codes <- data_mortality_multiple_2024 |>
+  filter(name == "education") |>
+  pull(codes)
+
+edu_codes
+```
+
+You can pass that string directly to `decode_column()` to translate a vector
+of raw values:
+
+```{r decode-column-example, eval=FALSE}
+decode_column(c(1, 3, 6, 9), edu_codes)
+```
+
+`decode_column()` handles leading-zero padding automatically, so integer and
+character inputs both work.
+
+---
+
+## From Raw File to Decoded Tribble
+
+The metadata objects sit at the center of every data-loading workflow in the
+package. Here is the full picture:
+
+### Option A — One-line import (recommended)
+
+`cdc_import()` is a full pipeline wrapper: it downloads the CDC file,
+reads it using the correct metadata, and decodes all coded columns in one call.
+
+```{r cdc-import, eval = FALSE}
+# Download, parse, and decode the 2024 mortality data
+deaths_2024 <- cdc_import("mortality_multiple", 2024)
+```
+
+### Option B — Step by step
+
+If you already have the file on disk, use `read_section()` to parse it and
+then `decode_all()` to decode it:
+
+```{r step-by-step, eval = FALSE}
+meta <- data_mortality_multiple_2024
+
+# 1. Parse the fixed-width file using the metadata layout
+deaths_raw <- read_section("VS24MORT.DUSMCPUB", meta)
+
+# 2. Decode all coded columns in one pass
+deaths_decoded <- decode_all(deaths_raw, meta)
+```
+
+`read_section()` reads every column as character to avoid silent coercion of
+coded numeric fields. `decode_all()` then replaces the raw codes with
+human-readable labels and returns columns in metadata order.
+
+### Option C — Preview before committing
+
+While exploring, `decode_preview()` lets you see the original and decoded
+values side by side without modifying the full dataset:
+
+```{r decode-preview, eval = FALSE}
+# Preview the first 5 coded columns (1 000 rows by default)
+decode_preview(deaths_raw, meta)
+
+# Preview 10 coded columns
+decode_preview(deaths_raw, meta, first_n = 10)
+
+# Also include column 17 specifically
+decode_preview(deaths_raw, meta, numbers = 17)
+
+# Decode everything and return the full dataset
+deaths_decoded <- decode_preview(deaths_raw, meta, all = TRUE, n_rows = nrow(deaths_raw))
+```
+
+When `all = FALSE` (the default), `decode_preview()` returns each original
+column immediately next to a `_label` companion column — convenient for
+spot-checking that codes are mapping as expected before running `decode_all()`.
+
+---
+
+## Field Groups at a Glance
+
+The metadata covers several thematic groups. Here is a quick overview of the
+most commonly used ones.
+
+### Administrative / record identifiers
+
+`record_type` and `resident_status` identify whether the decedent was a state
+resident or came from out of state. These are important when filtering to a
+specific geographic population.
+
+```{r admin-fields, eval=FALSE}
+data_mortality_multiple_2024 |>
+  filter(name %in% c("record_type", "resident_status")) |>
+  select(name, description, codes)
+```
+
+### Education
+
+Two fields capture education: the level itself and a reporting flag indicating
+which version of the death-certificate education question was used. Because
+states adopted the 2003 revision at different times, the flag is essential for
+longitudinal comparisons.
+
+```{r education-fields, eval=FALSE}
+data_mortality_multiple_2024 |>
+  filter(startsWith(name, "education")) |>
+  select(name, description, codes)
+```
+
+### Reserved / filler fields
+
+Fields named `reserved_*` are placeholder positions in the fixed-width layout.
+They carry no information and can be safely ignored in analysis, but the
+metadata includes them so that all character positions remain correct for
+`read_section()`.
+
+```{r reserved-fields, eval=FALSE}
+data_mortality_multiple_2024 |>
+  filter(startsWith(name, "reserved")) |>
+  select(name, start, end, size)
+```
+
+---
+
+## Tips for Beginners
+
+- **`start` and `end` positions** are 1-indexed character positions in the
+  raw flat file. You don't normally need them once the file has been parsed,
+  but they're useful if you're debugging a parsing issue.
+
+- **`type = "int"` vs `"str"`** indicates how the raw characters should be
+  interpreted. The CDC conventionally uses `"9"`, `"99"`, `"999"`, etc. to
+  represent "Unknown" for fields of different widths — always check the
+  `codes` column before treating those values as numeric unknowns.
+
+- **`decode_column()` for one-off lookups** — if you just need to translate a
+  handful of values interactively, `decode_column()` takes any vector and a
+  codes string and returns labels directly, without needing a full dataset.
+
+- **Match metadata year to data year** — always use the metadata object that
+  corresponds to your data year. The CDC's field layouts and code definitions
+  change across years, so `data_mortality_multiple_2010` and
+  `data_mortality_multiple_2024` are not interchangeable.
+
+---

@@ -29,7 +29,9 @@ Imports:
     tidyr,
     magrittr,
     httr2,
-    readr
+    readr,
+    cli,
+    processx
 Suggests: 
     testthat (>= 3.0.0),
     withr,
